@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.etg.consent.ConsentDeniedException;
+import com.etg.consent.ConsentService;
 import com.etg.outbox.OutboxRepository;
 import com.etg.salesforce.SalesforceSync;
 import java.util.Optional;
@@ -25,6 +26,7 @@ class MessageServiceTest {
   @Mock TwilioSender sender;
   @Mock SendPolicy policy;
   @Mock SalesforceSync sync;
+  @Mock ConsentService consentService;
   @Spy com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
   @InjectMocks MessageService service;
 

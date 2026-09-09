@@ -3,6 +3,7 @@ package com.etg.messaging;
 import com.etg.outbox.OutboxEvent;
 import com.etg.outbox.OutboxRepository;
 import com.etg.salesforce.SalesforceSync;
+import com.etg.consent.ConsentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -27,10 +28,12 @@ public class MessageService {
   private final SendPolicy policy;
   private final ObjectMapper json;
   private final SalesforceSync sync;
+  private final ConsentService consent;
 
   public MessageService(MessageRepository messages, DeliveryRepository deliveries,
                         OutboxRepository outbox, TwilioSender sender,
-                        SendPolicy policy, ObjectMapper json, SalesforceSync sync) {
+                        SendPolicy policy, ObjectMapper json, SalesforceSync sync,
+                        ConsentService consent) {
     this.messages = messages;
     this.deliveries = deliveries;
     this.outbox = outbox;
@@ -38,6 +41,7 @@ public class MessageService {
     this.policy = policy;
     this.json = json;
     this.sync = sync;
+    this.consent = consent;
   }
 
   @Transactional
@@ -45,6 +49,7 @@ public class MessageService {
                       String idempotencyKey, String recipientTimezone) {
     return messages.findByIdempotencyKey(idempotencyKey)
         .orElseGet(() -> {
+          consent.requireOptIn(toPhone, topic); // TCPA gate for every send path (ADR-007)
           policy.check(toPhone, topic, recipientTimezone);
           String sid = sender.send(toPhone, body);
           Message m = new Message("default", toPhone, null, "sms", topic,
