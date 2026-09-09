@@ -84,6 +84,11 @@
       <artifactId>libphonenumber</artifactId>
       <version>8.13.44</version>
     </dependency>
+    <dependency>
+      <groupId>nl.big-o</groupId>
+      <artifactId>liqp</artifactId>
+      <version>0.9.2.3</version>
+    </dependency>
     <!-- Cloud-portability adapters (wired by profile; safe to keep on classpath) -->
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
