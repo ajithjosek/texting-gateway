@@ -51,6 +51,14 @@ class TwilioInboundApiTest {
   }
 
   @Test
+  void bal_withoutLinkedAccount_isHonest() throws Exception {
+    mvc.perform(post("/twilio/inbound").contentType(MediaType.APPLICATION_FORM_URLENCODED)
+            .param("From", "+15550004204").param("Body", "BAL"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("not connected yet")));
+  }
+
+  @Test
   void dlr_accepted() throws Exception {
     mvc.perform(post("/twilio/dlr").contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .param("MessageSid", "SM123").param("MessageStatus", "delivered"))

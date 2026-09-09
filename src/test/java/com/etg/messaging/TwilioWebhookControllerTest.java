@@ -3,7 +3,6 @@ package com.etg.messaging;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.etg.consent.ConsentService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,13 +15,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ExtendWith(MockitoExtension.class)
 class TwilioWebhookControllerTest {
 
-  @Mock ConsentService consent;
+  @Mock KeywordRouter router;
   @Mock MessageService messages;
   TwilioWebhookController controller;
 
   @BeforeEach
   void setUp() {
-    controller = new TwilioWebhookController(consent, messages);
+    controller = new TwilioWebhookController(router, messages);
     ReflectionTestUtils.setField(controller, "authToken", ""); // local-dev: skip signature check
   }
 
@@ -31,37 +30,24 @@ class TwilioWebhookControllerTest {
   }
 
   @Test
-  void inbound_stop_optsOutBothTopics_andConfirms() {
-    String twiml = controller.inbound(req(), "+15550009333", "STOP");
-    assertThat(twiml).contains("unsubscribed");
-    verify(consent).optOut("+15550009333", "marketing", "keyword", "twilio");
-    verify(consent).optOut("+15550009333", "servicing", "keyword", "twilio");
+  void inbound_delegatesToRouter_andWrapsInTwiml() {
+    when(router.route("+15550009333", "BAL")).thenReturn("Balance $5 & change <soon>");
+    String twiml = controller.inbound(req(), "+15550009333", "BAL");
+    assertThat(twiml).startsWith("<Response><Message>").contains("Balance $5 &amp; change &lt;soon&gt;");
+    verify(router).route("+15550009333", "BAL");
   }
 
   @Test
-  void inbound_stopVariants_caseInsensitive_withTrailingWords() {
-    assertThat(controller.inbound(req(), "+15550009334", "stop all please")).contains("unsubscribed");
-    assertThat(controller.inbound(req(), "+15550009334", "Unsubscribe")).contains("unsubscribed");
-    assertThat(controller.inbound(req(), "+15550009334", "QUIT")).contains("unsubscribed");
-  }
-
-  @Test
-  void inbound_help_returnsHelpText_withoutTouchingConsent() {
-    assertThat(controller.inbound(req(), "+15550009335", "help")).contains("Reply STOP");
-    verifyNoInteractions(consent);
-  }
-
-  @Test
-  void inbound_unknownBody_routesToAgentInbox() {
-    assertThat(controller.inbound(req(), "+15550009336", "what is my balance?")).contains("agent will reply");
-    verifyNoInteractions(consent);
-  }
-
-  @Test
-  void inbound_invalidSignature_returnsEmptyResponse() {
+  void inbound_invalidSignature_returnsEmptyResponse_withoutRouting() {
     ReflectionTestUtils.setField(controller, "authToken", "secret");
     // No X-Twilio-Signature header -> validator rejects
     assertThat(controller.inbound(req(), "+15550009337", "STOP")).isEqualTo("<Response></Response>");
-    verifyNoInteractions(consent);
+    verifyNoInteractions(router);
+  }
+
+  @Test
+  void dlr_delegatesToMessageService() {
+    controller.dlr(req(), "SM1", "delivered", null);
+    verify(messages).recordDelivery("SM1", "delivered", null);
   }
 }

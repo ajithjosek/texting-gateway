@@ -1,6 +1,5 @@
 package com.etg.messaging;
 
-import com.etg.consent.ConsentService;
 import com.twilio.security.RequestValidator;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
@@ -9,15 +8,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
-/** Validates X-Twilio-Signature, acks <500ms, then routes keywords. See docs/00-design-decisions.md sequences. */
+/** Validates X-Twilio-Signature, acks <500ms, then delegates to KeywordRouter. See docs/00-design-decisions.md sequences. */
 @RestController
 @RequestMapping("/twilio")
 public class TwilioWebhookController {
-  private final ConsentService consent;
+  private final KeywordRouter router;
   private final MessageService messages;
 
-  public TwilioWebhookController(ConsentService consent, MessageService messages) {
-    this.consent = consent; this.messages = messages;
+  public TwilioWebhookController(KeywordRouter router, MessageService messages) {
+    this.router = router; this.messages = messages;
   }
 
   @Value("${TWILIO_AUTH_TOKEN:}") private String authToken;
@@ -31,23 +30,18 @@ public class TwilioWebhookController {
     return new RequestValidator(authToken).validate(url, params, sig);
   }
 
+  private static String twiml(String text) {
+    String safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    return "<Response><Message>" + safe + "</Message></Response>";
+  }
+
   @PostMapping(value = "/inbound", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
       produces = MediaType.APPLICATION_XML_VALUE)
   public String inbound(HttpServletRequest req,
       @RequestParam(value = "From", required = false) String from,
       @RequestParam(value = "Body", required = false, defaultValue = "") String body) {
     if (!valid(req)) return "<Response></Response>";
-    String keyword = body.trim().toUpperCase();
-    if (keyword.startsWith("STOP") || keyword.startsWith("UNSUBSCRIBE") || keyword.startsWith("QUIT")) {
-      consent.optOut(from, "marketing", "keyword", "twilio");
-      consent.optOut(from, "servicing", "keyword", "twilio");
-      return "<Response><Message>You have been unsubscribed. Reply HELP for help.</Message></Response>";
-    }
-    if (keyword.startsWith("HELP")) {
-      return "<Response><Message>ETG alerts. Reply STOP to opt out. Help: support@example.com</Message></Response>";
-    }
-    // MVP: hand anything else to agent inbox (Phase-1 queue); keyword flows (BAL/STATUS/CLAIM) land here next.
-    return "<Response><Message>Thanks — an agent will reply shortly.</Message></Response>";
+    return twiml(router.route(from, body));
   }
 
   @PostMapping(value = "/dlr", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
