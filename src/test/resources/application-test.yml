@@ -15,3 +15,6 @@ management:
       enabled: false
     rabbit:
       enabled: false
+etg:
+  renewal:
+    enabled: false
