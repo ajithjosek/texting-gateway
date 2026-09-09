@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.etg.consent.ConsentDeniedException;
+import com.etg.outbox.OutboxRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -17,8 +20,10 @@ class MessageServiceTest {
 
   @Mock MessageRepository messages;
   @Mock DeliveryRepository deliveries;
+  @Mock OutboxRepository outbox;
   @Mock TwilioSender sender;
   @Mock SendPolicy policy;
+  @Spy com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
   @InjectMocks MessageService service;
 
   @Test
@@ -34,17 +39,19 @@ class MessageServiceTest {
     assertThat(m.getBodyHash()).hasSize(64).doesNotContain("renewal due");
     assertThat(m.getBodyHash()).isEqualTo(MessageService.sha256Hex("renewal due"));
     verify(policy).check("+15550005001", "servicing", null);
+    verify(outbox).save(argThat(e ->
+        "message.created".equals(e.getEventType()) && e.getPayload().contains("SM111")));
   }
 
   @Test
   void send_policyDenial_blocksWithoutSendingOrSaving() {
     when(messages.findByIdempotencyKey("k-9")).thenReturn(Optional.empty());
-    doThrow(new com.etg.consent.ConsentDeniedException("CONSENT_DENIED_quiet_hours"))
+    doThrow(new ConsentDeniedException("CONSENT_DENIED_quiet_hours"))
         .when(policy).check("+15550005009", "marketing", "America/New_York");
 
     assertThatThrownBy(
         () -> service.send("+15550005009", "marketing", "promo", "k-9", "America/New_York"))
-        .isInstanceOf(com.etg.consent.ConsentDeniedException.class);
+        .isInstanceOf(ConsentDeniedException.class);
     verifyNoInteractions(sender);
     verify(messages, never()).save(any());
   }
@@ -74,10 +81,11 @@ class MessageServiceTest {
   }
 
   @Test
-  void recordDelivery_appendsRow_andRollsMessageStatus() {
+  void recordDelivery_appendsRow_rollsStatus_andEmitsEvent() {
     Message m = new Message("default", "+15550005004", null, "sms", "servicing",
         "hash", "queued", "SM444", "k-4");
     when(messages.findByTwilioSid("SM444")).thenReturn(Optional.of(m));
+    when(deliveries.save(any(Delivery.class))).thenAnswer(i -> i.getArgument(0));
 
     service.recordDelivery("SM444", "Delivered", null);
 
@@ -85,11 +93,14 @@ class MessageServiceTest {
     verify(deliveries).save(argThat(d ->
         "SM444".equals(d.getMessageSid()) && "delivered".equals(d.getStatus())));
     verify(messages).save(m);
+    verify(outbox).save(argThat(e ->
+        "delivery.updated".equals(e.getEventType()) && e.getPayload().contains("SM444")));
   }
 
   @Test
   void recordDelivery_unknownSid_stillAppendsRow() {
     when(messages.findByTwilioSid("SM-unknown")).thenReturn(Optional.empty());
+    when(deliveries.save(any(Delivery.class))).thenAnswer(i -> i.getArgument(0));
 
     service.recordDelivery("SM-unknown", "failed", "30007");
 

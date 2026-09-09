@@ -10,6 +10,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-etg}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-etg}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-etg}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-etg}
+      SPRING_DATA_REDIS_HOST: redis
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
       TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-}
@@ -41,8 +45,9 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-etg}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-etg}
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -rabbitmq_management load_definitions "/etc/rabbitmq/definitions.json"
     ports: ["15672:15672"]
-    volumes: [rabbitdata:/var/lib/rabbitmq]
+    volumes: [rabbitdata:/var/lib/rabbitmq, ./rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro]
     restart: unless-stopped
 
   minio:

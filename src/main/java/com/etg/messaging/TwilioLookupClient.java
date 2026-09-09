@@ -1,5 +1,6 @@
 package com.etg.messaging;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -8,18 +9,31 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Thin wrapper over Twilio Lookup v2 (line_type_intelligence).
+ * Thin wrapper over Twilio Lookup v2 (line_type_intelligence), fronted by LookupCache.
  * Fail-open: without credentials or on Lookup outage it returns empty and local
  * libphonenumber validation alone governs. Never blocks sends on Lookup downtime.
  */
 @Component
 public class TwilioLookupClient {
   private static final Logger log = LoggerFactory.getLogger(TwilioLookupClient.class);
+  private static final Duration CACHE_TTL = Duration.ofHours(24);
+
+  private final LookupCache cache;
+
+  public TwilioLookupClient(LookupCache cache) { this.cache = cache; }
 
   @Value("${TWILIO_ACCOUNT_SID:}") private String accountSid;
   @Value("${TWILIO_AUTH_TOKEN:}") private String authToken;
 
   public Optional<String> lineType(String e164) {
+    var cached = cache.get(e164);
+    if (cached != null) return cached.get();
+    Optional<String> live = fetch(e164);
+    cache.put(e164, live, CACHE_TTL);
+    return live;
+  }
+
+  private Optional<String> fetch(String e164) {
     if (accountSid == null || accountSid.isBlank() || authToken == null || authToken.isBlank()) {
       return Optional.empty();
     }

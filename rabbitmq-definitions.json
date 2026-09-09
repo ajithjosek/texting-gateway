@@ -1,0 +1,21 @@
+{
+  "rabbit_version": "3.13",
+  "rabbitmq_version": "3.13",
+  "product_info": [],
+  "parameters": [],
+  "policies": [],
+  "users": [],
+  "vhosts": [{ "name": "/" }],
+  "permissions": [],
+  "topic_permissions": [],
+  "queues": [
+    { "name": "etg.warehouse", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
+  ],
+  "exchanges": [
+    { "name": "etg.events", "vhost": "/", "type": "topic", "durable": true, "auto_delete": false, "arguments": {} }
+  ],
+  "bindings": [
+    { "source": "etg.events", "vhost": "/", "destination": "etg.warehouse", "destination_type": "queue", "routing_key": "message.created", "arguments": {} },
+    { "source": "etg.events", "vhost": "/", "destination": "etg.warehouse", "destination_type": "queue", "routing_key": "delivery.updated", "arguments": {} }
+  ]
+}

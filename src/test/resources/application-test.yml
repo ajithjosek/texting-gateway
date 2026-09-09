@@ -9,3 +9,9 @@ spring:
       ddl-auto: create-drop
   flyway:
     enabled: false
+management:
+  health:
+    redis:
+      enabled: false
+    rabbit:
+      enabled: false
