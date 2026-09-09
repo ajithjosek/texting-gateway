@@ -3,9 +3,13 @@ package com.etg.messaging;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.etg.claimcenter.ClaimCenterClient;
+import com.etg.claimcenter.ClaimStatus;
 import com.etg.consent.ConsentService;
 import com.etg.inbox.InboxService;
 import com.etg.salesforce.SalesforceSync;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -19,6 +23,7 @@ class KeywordRouterTest {
   @Mock BalanceProvider balances;
   @Mock InboxService inbox;
   @Mock SalesforceSync sync;
+  @Mock ClaimCenterClient claims;
   @InjectMocks KeywordRouter router;
 
   @Test
@@ -49,8 +54,43 @@ class KeywordRouterTest {
   }
 
   @Test
+  void status_found_returnsDetails_withoutInboxThread() {
+    when(claims.statusOf("CLM-1001")).thenReturn(Optional.of(
+        new ClaimStatus("CLM-1001", "Open", "R. Diaz", "Jun 10")));
+    assertThat(router.route("+15550007005", "STATUS CLM-1001")).contains("R. Diaz");
+    verifyNoInteractions(inbox);
+  }
+
+  @Test
+  void status_missingNumber_returnsUsage() {
+    assertThat(router.route("+15550007005", "STATUS")).contains("STATUS CLM-1001");
+  }
+
+  @Test
+  void status_unknown_opensInboxThread() {
+    when(claims.statusOf("CLM-9")).thenReturn(Optional.empty());
+    assertThat(router.route("+15550007005", "STATUS CLM-9")).contains("couldn't find");
+    verify(inbox).noteInbound("+15550007005", "claims", "STATUS CLM-9");
+  }
+
+  @Test
+  void schedule_listsSlots_and_book_confirms() {
+    when(claims.slotsFor("CLM-1001")).thenReturn(List.of(
+        new com.etg.claimcenter.AdjusterSlot("S1", "CLM-1001", "Mon 9:00 AM ET")));
+    assertThat(router.route("+15550007005", "SCHEDULE CLM-1001")).contains("S1");
+    when(claims.bookSlot("CLM-1001", "S1", "+15550007005")).thenReturn(Optional.of(
+        new com.etg.claimcenter.Booking("CLM-1001", "S1", "BKG-1")));
+    assertThat(router.route("+15550007005", "BOOK CLM-1001 S1")).contains("BKG-1");
+  }
+
+  @Test
+  void book_unknownSlot_opensInboxThread() {
+    when(claims.bookSlot("CLM-1001", "S9", "+15550007005")).thenReturn(Optional.empty());
+    assertThat(router.route("+15550007005", "BOOK CLM-1001 S9")).contains("no longer available");
+  }
+
+  @Test
   void futureKeywords_haveStableSeams() {
-    assertThat(router.route("+15550007005", "STATUS 12345")).contains("S4");
     assertThat(router.route("+15550007005", "CLAIM")).contains("S4");
     assertThat(router.route("+15550007005", "PAY")).contains("S3");
     verifyNoInteractions(consent);
