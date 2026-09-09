@@ -1,6 +1,7 @@
 package com.etg.messaging;
 
 import com.etg.consent.ConsentService;
+import com.etg.inbox.InboxService;
 import org.springframework.stereotype.Service;
 
 /**
@@ -12,10 +13,12 @@ import org.springframework.stereotype.Service;
 public class KeywordRouter {
   private final ConsentService consent;
   private final BalanceProvider balances;
+  private final InboxService inbox;
 
-  public KeywordRouter(ConsentService consent, BalanceProvider balances) {
+  public KeywordRouter(ConsentService consent, BalanceProvider balances, InboxService inbox) {
     this.consent = consent;
     this.balances = balances;
+    this.inbox = inbox;
   }
 
   public String route(String from, String body) {
@@ -32,6 +35,7 @@ public class KeywordRouter {
     if (keyword.startsWith("BAL")) {
       String balance = balances.balanceFor(from);
       if (balance != null) return balance;
+      inbox.noteInbound(from, "servicing", body);
       return "Your balance lookup is not connected yet. An agent will text your balance shortly.";
     }
     if (keyword.startsWith("STATUS")) {
@@ -41,8 +45,10 @@ public class KeywordRouter {
       return "Text FNOL arrives with the ClaimCenter adapter (S4). For urgent claims call support@example.com.";
     }
     if (keyword.startsWith("PAY")) {
-      return "Pay-by-text arrives with the billing adapter (S2). An agent will send your payment link shortly.";
+      inbox.noteInbound(from, "billing", body);
+      return "Pay-by-text self-service arrives in S3. An agent will send your payment link shortly.";
     }
+    inbox.noteInbound(from, "servicing", body);
     return "Thanks — an agent will reply shortly.";
   }
 }

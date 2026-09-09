@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.etg.consent.ConsentService;
+import com.etg.inbox.InboxService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -15,6 +16,7 @@ class KeywordRouterTest {
 
   @Mock ConsentService consent;
   @Mock BalanceProvider balances;
+  @Mock InboxService inbox;
   @InjectMocks KeywordRouter router;
 
   @Test
@@ -48,7 +50,7 @@ class KeywordRouterTest {
   void futureKeywords_haveStableSeams() {
     assertThat(router.route("+15550007005", "STATUS 12345")).contains("S4");
     assertThat(router.route("+15550007005", "CLAIM")).contains("S4");
-    assertThat(router.route("+15550007005", "PAY")).contains("S2");
+    assertThat(router.route("+15550007005", "PAY")).contains("S3");
     verifyNoInteractions(consent);
   }
 
