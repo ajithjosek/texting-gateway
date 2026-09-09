@@ -14,8 +14,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/twilio")
 public class TwilioWebhookController {
   private final ConsentService consent;
+  private final MessageService messages;
 
-  public TwilioWebhookController(ConsentService consent) { this.consent = consent; }
+  public TwilioWebhookController(ConsentService consent, MessageService messages) {
+    this.consent = consent; this.messages = messages;
+  }
 
   @Value("${TWILIO_AUTH_TOKEN:}") private String authToken;
 
@@ -50,7 +53,8 @@ public class TwilioWebhookController {
   @PostMapping(value = "/dlr", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
   public void dlr(HttpServletRequest req,
       @RequestParam(value = "MessageSid", required = false) String sid,
-      @RequestParam(value = "MessageStatus", required = false) String status) {
-    // Phase-1: persist to deliveries table + outbox -> CRM/warehouse. Stubbed for scaffold.
+      @RequestParam(value = "MessageStatus", required = false) String status,
+      @RequestParam(value = "ErrorCode", required = false) String errorCode) {
+    messages.recordDelivery(sid, status, errorCode);
   }
 }

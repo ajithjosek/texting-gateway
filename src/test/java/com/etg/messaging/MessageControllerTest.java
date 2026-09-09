@@ -16,34 +16,44 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MessageControllerTest {
 
   @Mock ConsentService consent;
-  @Mock TwilioSender sender;
+  @Mock MessageService messages;
   @InjectMocks MessageController controller;
+
+  private static Message saved(String sid, String key, String status) {
+    return new Message("default", "+15550009223", null, "sms", "servicing",
+        "hash", status, sid, key);
+  }
 
   @Test
   void send_blockedWhenNoConsent() {
     doThrow(new ConsentDeniedException("CONSENT_DENIED_no_opt_in"))
         .when(consent).requireOptIn("+15550009222", "marketing");
     var req = new MessageController.SendRequest("+15550009222", "marketing", "hi", null);
-    assertThatThrownBy(() -> controller.send(req, "", null))
+    assertThatThrownBy(() -> controller.send(req, null))
         .isInstanceOf(ConsentDeniedException.class);
-    verifyNoInteractions(sender);
+    verifyNoInteractions(messages);
   }
 
   @Test
-  void send_usesBodyIdempotencyKey_andReturnsSenderSid() {
-    when(sender.send("+15550009223", "renewal due")).thenReturn("SM123");
+  void send_usesBodyIdempotencyKey_andReturnsStoredRow() {
+    when(messages.send("+15550009223", "servicing", "renewal due", "key-1"))
+        .thenReturn(saved("SM123", "key-1", "queued"));
     var req = new MessageController.SendRequest("+15550009223", "servicing", "renewal due", "key-1");
-    Map<String, String> res = controller.send(req, "", null);
+    Map<String, String> res = controller.send(req, null);
     assertThat(res).containsEntry("sid", "SM123").containsEntry("idempotencyKey", "key-1");
     verify(consent).requireOptIn("+15550009223", "servicing");
   }
 
   @Test
   void send_fallsBackToHeaderKey_thenGeneratesUuid() {
-    when(sender.send(anyString(), anyString())).thenReturn("SM999");
+    when(messages.send(eq("+15550009224"), eq("billing"), eq("due"), eq("hdr-9")))
+        .thenReturn(saved("SM1", "hdr-9", "queued"));
     var fromHeader = new MessageController.SendRequest("+15550009224", "billing", "due", null);
-    assertThat(controller.send(fromHeader, "", "hdr-9")).containsEntry("idempotencyKey", "hdr-9");
+    assertThat(controller.send(fromHeader, "hdr-9")).containsEntry("idempotencyKey", "hdr-9");
+
+    when(messages.send(eq("+15550009225"), eq("billing"), eq("due"), argThat(k -> k != null && !k.isBlank())))
+        .thenAnswer(i -> saved("SM2", i.getArgument(3), "queued"));
     var generated = new MessageController.SendRequest("+15550009225", "billing", "due", null);
-    assertThat(controller.send(generated, "", null).get("idempotencyKey")).isNotBlank();
+    assertThat(controller.send(generated, null).get("idempotencyKey")).isNotBlank();
   }
 }

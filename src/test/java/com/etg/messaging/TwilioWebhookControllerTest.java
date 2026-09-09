@@ -17,11 +17,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 class TwilioWebhookControllerTest {
 
   @Mock ConsentService consent;
+  @Mock MessageService messages;
   TwilioWebhookController controller;
 
   @BeforeEach
   void setUp() {
-    controller = new TwilioWebhookController(consent);
+    controller = new TwilioWebhookController(consent, messages);
     ReflectionTestUtils.setField(controller, "authToken", ""); // local-dev: skip signature check
   }
 
