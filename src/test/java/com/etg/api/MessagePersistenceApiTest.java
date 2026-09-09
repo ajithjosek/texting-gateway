@@ -8,14 +8,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.etg.messaging.DeliveryRepository;
 import com.etg.messaging.MessageRepository;
 import com.etg.messaging.MessageService;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 
 /** Persistence contract: sends create message rows, DLRs append deliveries and roll status. */
 @SpringBootTest
@@ -27,6 +35,16 @@ class MessagePersistenceApiTest {
   @Autowired MockMvc mvc;
   @Autowired MessageRepository messages;
   @Autowired DeliveryRepository deliveries;
+  @MockBean Clock clock;
+
+  @BeforeEach
+  void fixedDaytime() {
+    // Deterministic send-governance: 10:00 America/New_York, marketing allowed.
+    Instant now = Instant.parse("2026-06-01T14:00:00Z");
+    lenient().when(clock.instant()).thenReturn(now);
+    lenient().when(clock.withZone(any(ZoneId.class)))
+        .thenAnswer(i -> Clock.fixed(now, i.getArgument(0)));
+  }
 
   private void optIn(String phone, String topic) throws Exception {
     mvc.perform(post("/v1/consent/opt-in").contentType(MediaType.APPLICATION_JSON).content(

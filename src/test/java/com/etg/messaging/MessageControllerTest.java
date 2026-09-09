@@ -28,7 +28,7 @@ class MessageControllerTest {
   void send_blockedWhenNoConsent() {
     doThrow(new ConsentDeniedException("CONSENT_DENIED_no_opt_in"))
         .when(consent).requireOptIn("+15550009222", "marketing");
-    var req = new MessageController.SendRequest("+15550009222", "marketing", "hi", null);
+    var req = new MessageController.SendRequest("+15550009222", "marketing", "hi", null, null);
     assertThatThrownBy(() -> controller.send(req, null))
         .isInstanceOf(ConsentDeniedException.class);
     verifyNoInteractions(messages);
@@ -36,9 +36,10 @@ class MessageControllerTest {
 
   @Test
   void send_usesBodyIdempotencyKey_andReturnsStoredRow() {
-    when(messages.send("+15550009223", "servicing", "renewal due", "key-1"))
+    when(messages.send("+15550009223", "servicing", "renewal due", "key-1", "America/New_York"))
         .thenReturn(saved("SM123", "key-1", "queued"));
-    var req = new MessageController.SendRequest("+15550009223", "servicing", "renewal due", "key-1");
+    var req = new MessageController.SendRequest("+15550009223", "servicing", "renewal due",
+        "key-1", "America/New_York");
     Map<String, String> res = controller.send(req, null);
     assertThat(res).containsEntry("sid", "SM123").containsEntry("idempotencyKey", "key-1");
     verify(consent).requireOptIn("+15550009223", "servicing");
@@ -46,14 +47,15 @@ class MessageControllerTest {
 
   @Test
   void send_fallsBackToHeaderKey_thenGeneratesUuid() {
-    when(messages.send(eq("+15550009224"), eq("billing"), eq("due"), eq("hdr-9")))
+    when(messages.send(eq("+15550009224"), eq("billing"), eq("due"), eq("hdr-9"), isNull()))
         .thenReturn(saved("SM1", "hdr-9", "queued"));
-    var fromHeader = new MessageController.SendRequest("+15550009224", "billing", "due", null);
+    var fromHeader = new MessageController.SendRequest("+15550009224", "billing", "due", null, null);
     assertThat(controller.send(fromHeader, "hdr-9")).containsEntry("idempotencyKey", "hdr-9");
 
-    when(messages.send(eq("+15550009225"), eq("billing"), eq("due"), argThat(k -> k != null && !k.isBlank())))
+    when(messages.send(eq("+15550009225"), eq("billing"), eq("due"),
+        argThat(k -> k != null && !k.isBlank()), isNull()))
         .thenAnswer(i -> saved("SM2", i.getArgument(3), "queued"));
-    var generated = new MessageController.SendRequest("+15550009225", "billing", "due", null);
+    var generated = new MessageController.SendRequest("+15550009225", "billing", "due", null, null);
     assertThat(controller.send(generated, null).get("idempotencyKey")).isNotBlank();
   }
 }

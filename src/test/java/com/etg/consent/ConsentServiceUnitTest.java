@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ConsentServiceUnitTest {
 
   @Mock ConsentRepository repo;
+  @Mock ConsentEventRepository events;
   @InjectMocks ConsentService service;
 
   @Test
@@ -52,5 +53,20 @@ class ConsentServiceUnitTest {
     when(repo.save(any(Consent.class))).thenAnswer(i -> i.getArgument(0));
     Consent saved = service.optOut("+15550009003", "marketing", "keyword", "twilio");
     assertThat(saved.getStatus()).isEqualTo("opted_out");
+  }
+
+  @Test
+  void transitions_writeAuditEvents_withOldAndNewStatus() {
+    Consent existing = new Consent("+15550009004", "servicing", "opted_out", "keyword", "n/a", "twilio");
+    when(repo.findByPhoneE164AndTopic("+15550009004", "servicing")).thenReturn(Optional.of(existing));
+    when(repo.save(any(Consent.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.optIn("+15550009004", "servicing", "api", "v2", "agent-1");
+
+    verify(events).save(argThat(e ->
+        "+15550009004".equals(e.getPhoneE164())
+            && "opted_out".equals(e.getOldStatus())
+            && "opted_in".equals(e.getNewStatus())
+            && "api".equals(e.getSource())));
   }
 }

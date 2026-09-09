@@ -17,17 +17,22 @@ public class MessageService {
   private final MessageRepository messages;
   private final DeliveryRepository deliveries;
   private final TwilioSender sender;
+  private final SendPolicy policy;
 
-  public MessageService(MessageRepository messages, DeliveryRepository deliveries, TwilioSender sender) {
+  public MessageService(MessageRepository messages, DeliveryRepository deliveries,
+                        TwilioSender sender, SendPolicy policy) {
     this.messages = messages;
     this.deliveries = deliveries;
     this.sender = sender;
+    this.policy = policy;
   }
 
   @Transactional
-  public Message send(String toPhone, String topic, String body, String idempotencyKey) {
+  public Message send(String toPhone, String topic, String body,
+                      String idempotencyKey, String recipientTimezone) {
     return messages.findByIdempotencyKey(idempotencyKey)
         .orElseGet(() -> {
+          policy.check(toPhone, topic, recipientTimezone);
           String sid = sender.send(toPhone, body);
           Message m = new Message("default", toPhone, null, "sms", topic,
               sha256Hex(body), "queued", sid, idempotencyKey);

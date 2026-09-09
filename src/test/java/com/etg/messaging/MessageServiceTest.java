@@ -18,6 +18,7 @@ class MessageServiceTest {
   @Mock MessageRepository messages;
   @Mock DeliveryRepository deliveries;
   @Mock TwilioSender sender;
+  @Mock SendPolicy policy;
   @InjectMocks MessageService service;
 
   @Test
@@ -26,12 +27,26 @@ class MessageServiceTest {
     when(sender.send("+15550005001", "renewal due")).thenReturn("SM111");
     when(messages.save(any(Message.class))).thenAnswer(i -> i.getArgument(0));
 
-    Message m = service.send("+15550005001", "servicing", "renewal due", "k-1");
+    Message m = service.send("+15550005001", "servicing", "renewal due", "k-1", null);
 
     assertThat(m.getTwilioSid()).isEqualTo("SM111");
     assertThat(m.getStatus()).isEqualTo("queued");
     assertThat(m.getBodyHash()).hasSize(64).doesNotContain("renewal due");
     assertThat(m.getBodyHash()).isEqualTo(MessageService.sha256Hex("renewal due"));
+    verify(policy).check("+15550005001", "servicing", null);
+  }
+
+  @Test
+  void send_policyDenial_blocksWithoutSendingOrSaving() {
+    when(messages.findByIdempotencyKey("k-9")).thenReturn(Optional.empty());
+    doThrow(new com.etg.consent.ConsentDeniedException("CONSENT_DENIED_quiet_hours"))
+        .when(policy).check("+15550005009", "marketing", "America/New_York");
+
+    assertThatThrownBy(
+        () -> service.send("+15550005009", "marketing", "promo", "k-9", "America/New_York"))
+        .isInstanceOf(com.etg.consent.ConsentDeniedException.class);
+    verifyNoInteractions(sender);
+    verify(messages, never()).save(any());
   }
 
   @Test
@@ -40,7 +55,7 @@ class MessageServiceTest {
         "hash", "queued", "SM222", "k-2");
     when(messages.findByIdempotencyKey("k-2")).thenReturn(Optional.of(original));
 
-    assertThat(service.send("+15550005002", "billing", "due", "k-2")).isSameAs(original);
+    assertThat(service.send("+15550005002", "billing", "due", "k-2", null)).isSameAs(original);
     verifyNoInteractions(sender);
     verify(messages, never()).save(any());
   }
@@ -55,7 +70,7 @@ class MessageServiceTest {
     when(sender.send(anyString(), anyString())).thenReturn("SM-racy");
     when(messages.save(any())).thenThrow(new DataIntegrityViolationException("dup key"));
 
-    assertThat(service.send("+15550005003", "billing", "due", "k-3")).isSameAs(winner);
+    assertThat(service.send("+15550005003", "billing", "due", "k-3", null)).isSameAs(winner);
   }
 
   @Test
