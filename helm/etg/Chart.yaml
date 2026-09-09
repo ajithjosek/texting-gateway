@@ -1,0 +1,5 @@
+apiVersion: v2
+name: etg
+description: Enterprise Texting Gateway — Phase-2 Helm stub (same images as Compose)
+version: 0.1.0
+appVersion: "0.1.0"

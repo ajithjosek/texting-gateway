@@ -1,0 +1,7 @@
+replicaCount: 2
+image:
+  repository: etg/app
+  tag: "0.1.0"
+env:
+  APP_PROFILE: local
+# Phase 2: add postgres/redis/rabbitmq subcharts or managed-service values per cloud.

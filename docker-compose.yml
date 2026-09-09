@@ -1,0 +1,83 @@
+name: enterprise-texting-gateway
+services:
+  app:
+    build: .
+    image: etg/app:0.1.0
+    ports: ["8080:8080"]
+    env_file: [.env]
+    environment:
+      SPRING_PROFILES_ACTIVE: ${APP_PROFILE:-local}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-etg}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-etg}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-}
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+      rabbitmq: {condition: service_started}
+    healthcheck: {test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"], interval: 15s, retries: 10}
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-etg}
+      POSTGRES_USER: ${POSTGRES_USER:-etg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-etg}"], interval: 5s, retries: 20}
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-etg}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-etg}
+    ports: ["15672:15672"]
+    volumes: [rabbitdata:/var/lib/rabbitmq]
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2024-08-17T01-14-05Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:?set in .env, min 8 chars}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [miniadata:/data]
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    command: ["start-dev"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-etg}
+      KC_DB_USERNAME: ${POSTGRES_USER:-etg}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set in .env}
+    ports: ["8081:8080"]
+    depends_on:
+      db: {condition: service_healthy}
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports: ["3000:80"]
+    depends_on: [app]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitdata:
+  miniadata:
