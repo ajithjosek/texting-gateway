@@ -1,0 +1,10 @@
+-- ETG V6: FNOL SMS sessions (S4)
+CREATE TABLE IF NOT EXISTS fnol_sessions (
+  id BIGSERIAL PRIMARY KEY,
+  phone_e164 VARCHAR(32) NOT NULL UNIQUE,
+  step VARCHAR(32) NOT NULL DEFAULT 'VERIFY_POLICY',
+  policy_number VARCHAR(128),
+  loss_date VARCHAR(32),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

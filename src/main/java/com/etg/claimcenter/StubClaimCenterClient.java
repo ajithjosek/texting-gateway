@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Seeded demo claims until Guidewire credentials are configured. */
 public class StubClaimCenterClient implements ClaimCenterClient {
@@ -19,6 +20,7 @@ public class StubClaimCenterClient implements ClaimCenterClient {
 
   private final Clock clock;
   private final Map<String, ClaimStatus> claims = new ConcurrentHashMap<>();
+  private final AtomicInteger fnolSeq = new AtomicInteger(2000);
 
   public StubClaimCenterClient(Clock clock) {
     this.clock = clock;
@@ -49,6 +51,14 @@ public class StubClaimCenterClient implements ClaimCenterClient {
     if (!known) return Optional.empty();
     return Optional.of(new Booking(claimNumber.toUpperCase(), slotId.toUpperCase(),
         "BKG-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase()));
+  }
+
+  @Override
+  public Optional<FnolResult> createFnol(FnolRequest request) {
+    String number = "CLM-" + fnolSeq.incrementAndGet();
+    claims.put(number, new ClaimStatus(number, "Open - intake review",
+        "Unassigned", "Pending review"));
+    return Optional.of(new FnolResult(number));
   }
 
   private AdjusterSlot slot(String claimNumber, String suffix, Instant at) {

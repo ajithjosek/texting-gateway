@@ -11,4 +11,6 @@ public interface ClaimCenterClient {
   Optional<ClaimStatus> statusOf(String claimNumber);
   List<AdjusterSlot> slotsFor(String claimNumber);
   Optional<Booking> bookSlot(String claimNumber, String slotId, String phoneE164);
+  /** File a first notice of loss; empty when ClaimCenter rejects the request. */
+  Optional<FnolResult> createFnol(FnolRequest request);
 }

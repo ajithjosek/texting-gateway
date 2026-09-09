@@ -3,14 +3,16 @@ package com.etg.messaging;
 import com.etg.claimcenter.AdjusterSlot;
 import com.etg.claimcenter.ClaimCenterClient;
 import com.etg.consent.ConsentService;
+import com.etg.fnol.FnolService;
 import com.etg.inbox.InboxService;
 import com.etg.salesforce.SalesforceSync;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Single home for inbound keyword routing. STOP/HELP/BAL live here; STATUS, CLAIM
- * and PAY return honest not-yet-available replies behind the S2/S4 seams so the
- * router contract is stable before the Guidewire adapters land.
+ * Single home for inbound keyword routing. STOP/HELP always win; CLAIM/CANCEL drive
+ * the FNOL flow (behind etg.fnol-enabled); BAL/STATUS/SCHEDULE/BOOK serve lookups;
+ * anything else opens an agent inbox thread.
  */
 @Service
 public class KeywordRouter {
@@ -19,27 +21,43 @@ public class KeywordRouter {
   private final InboxService inbox;
   private final SalesforceSync sync;
   private final ClaimCenterClient claims;
+  private final FnolService fnol;
+  private final boolean fnolEnabled;
 
   public KeywordRouter(ConsentService consent, BalanceProvider balances,
-                       InboxService inbox, SalesforceSync sync, ClaimCenterClient claims) {
+                       InboxService inbox, SalesforceSync sync, ClaimCenterClient claims,
+                       FnolService fnol,
+                       @Value("${etg.fnol-enabled:true}") boolean fnolEnabled) {
     this.consent = consent;
     this.balances = balances;
     this.inbox = inbox;
     this.sync = sync;
     this.claims = claims;
+    this.fnol = fnol;
+    this.fnolEnabled = fnolEnabled;
   }
 
   public String route(String from, String body) {
     sync.syncContact(from, "servicing");
     String keyword = body == null ? "" : body.trim().toUpperCase();
     if (keyword.startsWith("STOP") || keyword.startsWith("UNSUBSCRIBE") || keyword.startsWith("QUIT")
-        || keyword.startsWith("END") || keyword.startsWith("CANCEL")) {
+        || keyword.startsWith("END")) {
       consent.optOut(from, "marketing", "keyword", "twilio");
       consent.optOut(from, "servicing", "keyword", "twilio");
       return "You have been unsubscribed. Reply HELP for help.";
     }
     if (keyword.startsWith("HELP")) {
       return "ETG alerts. Reply STOP to opt out. Help: support@example.com";
+    }
+    if (fnolEnabled) {
+      if (keyword.startsWith("CLAIM")) return fnol.start(from);
+      if (keyword.startsWith("CANCEL")) return fnol.cancel(from);
+      if (fnol.hasActiveSession(from)) {
+        String next = fnol.advance(from, body);
+        if (next != null) return next;
+      }
+    } else if (keyword.startsWith("CLAIM")) {
+      return "Text FNOL arrives with the ClaimCenter adapter (S4). For urgent claims call support@example.com.";
     }
     if (keyword.startsWith("BAL")) {
       String balance = balances.balanceFor(from);
@@ -94,9 +112,6 @@ public class KeywordRouter {
       }
       return "Booked! Confirmation " + booked.get().confirmation()
           + ". Your adjuster will confirm by text.";
-    }
-    if (keyword.startsWith("CLAIM")) {
-      return "Text FNOL arrives with the ClaimCenter adapter (S4). For urgent claims call support@example.com.";
     }
     if (keyword.startsWith("PAY")) {
       inbox.noteInbound(from, "billing", body);

@@ -59,4 +59,15 @@ class RestClaimCenterClientTest {
         .contains(new Booking("CLM-1001", "S1", "BKG-7"));
     server.verify();
   }
+
+  @Test
+  void createFnol_postsAndReturnsNumber() {
+    server.expect(requestTo("https://gw.example/cc/rest/claims/fnol"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withSuccess("{\"number\":\"CLM-3001\"}", MediaType.APPLICATION_JSON));
+    assertThat(client.createFnol(
+        new com.etg.claimcenter.FnolRequest("+15550012004", "POL-6", "2026-05-30", "HOME")))
+        .contains(new com.etg.claimcenter.FnolResult("CLM-3001"));
+    server.verify();
+  }
 }

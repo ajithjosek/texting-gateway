@@ -6,10 +6,12 @@ import static org.mockito.Mockito.*;
 import com.etg.claimcenter.ClaimCenterClient;
 import com.etg.claimcenter.ClaimStatus;
 import com.etg.consent.ConsentService;
+import com.etg.fnol.FnolService;
 import com.etg.inbox.InboxService;
 import com.etg.salesforce.SalesforceSync;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -24,15 +26,22 @@ class KeywordRouterTest {
   @Mock InboxService inbox;
   @Mock SalesforceSync sync;
   @Mock ClaimCenterClient claims;
-  @InjectMocks KeywordRouter router;
+  @Mock FnolService fnol;
+  KeywordRouter router;
+
+  @BeforeEach
+  void setUp() {
+    // @InjectMocks cannot satisfy the primitive flag; construct explicitly (flag ON).
+    router = new KeywordRouter(consent, balances, inbox, sync, claims, fnol, true);
+  }
 
   @Test
   void stopVariants_optOutBothTopics_andConfirm() {
-    for (String word : new String[] {"STOP", "stop all please", "Unsubscribe", "QUIT", "END", "CANCEL"}) {
+    for (String word : new String[] {"STOP", "stop all please", "Unsubscribe", "QUIT", "END"}) {
       assertThat(router.route("+15550007001", word)).contains("unsubscribed");
     }
-    verify(consent, times(6)).optOut("+15550007001", "marketing", "keyword", "twilio");
-    verify(consent, times(6)).optOut("+15550007001", "servicing", "keyword", "twilio");
+    verify(consent, times(5)).optOut("+15550007001", "marketing", "keyword", "twilio");
+    verify(consent, times(5)).optOut("+15550007001", "servicing", "keyword", "twilio");
   }
 
   @Test
@@ -90,8 +99,26 @@ class KeywordRouterTest {
   }
 
   @Test
+  void claim_delegatesToFnolFlow() {
+    when(fnol.start("+15550007008")).thenReturn("Reply with your policy number.");
+    assertThat(router.route("+15550007008", "CLAIM")).contains("policy number");
+    when(fnol.cancel("+15550007008")).thenReturn("cancelled");
+    assertThat(router.route("+15550007008", "CANCEL")).contains("cancelled");
+    when(fnol.hasActiveSession("+15550007008")).thenReturn(true);
+    when(fnol.advance("+15550007008", "POL-1")).thenReturn("next");
+    assertThat(router.route("+15550007008", "POL-1")).isEqualTo("next");
+  }
+
+  @Test
+  void claim_whenFlagDisabled_returnsSeamReply() {
+    KeywordRouter off =
+        new KeywordRouter(consent, balances, inbox, sync, claims, fnol, false);
+    assertThat(off.route("+15550007009", "CLAIM")).contains("S4");
+    verifyNoInteractions(fnol);
+  }
+
+  @Test
   void futureKeywords_haveStableSeams() {
-    assertThat(router.route("+15550007005", "CLAIM")).contains("S4");
     assertThat(router.route("+15550007005", "PAY")).contains("S3");
     verifyNoInteractions(consent);
   }

@@ -2,6 +2,8 @@ package com.etg.claimcenter;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.etg.claimcenter.FnolRequest;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -36,5 +38,15 @@ class StubClaimCenterClientTest {
         .map(Booking::confirmation)
         .hasValueSatisfying(c -> assertThat(c).startsWith("BKG-"));
     assertThat(client().bookSlot("CLM-1001", "S9", "+15550012001")).isEmpty();
+  }
+
+  @Test
+  void createFnol_mintsNumber_visibleToStatus() {
+    var stub = client();
+    var filed = stub.createFnol(
+        new FnolRequest("+15550012003", "POL-5", "2026-05-30", "AUTO"));
+    assertThat(filed).map(FnolResult::claimNumber)
+        .hasValueSatisfying(n -> assertThat(n).startsWith("CLM-"));
+    assertThat(stub.statusOf(filed.get().claimNumber())).isPresent();
   }
 }

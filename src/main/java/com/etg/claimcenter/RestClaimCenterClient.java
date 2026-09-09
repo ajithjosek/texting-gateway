@@ -66,6 +66,20 @@ public class RestClaimCenterClient implements ClaimCenterClient {
     }
   }
 
+  @Override
+  public Optional<FnolResult> createFnol(FnolRequest request) {
+    try {
+      var res = post("/cc/rest/claims/fnol", java.util.Map.of(
+          "phone", request.phoneE164(), "policyNumber", request.policyNumber(),
+          "lossDate", request.lossDate(), "lossType", request.lossType()), FnolJson.class);
+      if (res == null || res.number() == null) return Optional.empty();
+      return Optional.of(new FnolResult(res.number()));
+    } catch (Exception e) {
+      log.warn("ClaimCenter FNOL failed for {}: {}", request.policyNumber(), e.getMessage());
+      return Optional.empty();
+    }
+  }
+
   private <T> T get(String path, Class<T> type) {
     return http.exchange(baseUrl + path, HttpMethod.GET, new HttpEntity<>(auth()), type).getBody();
   }
@@ -84,4 +98,5 @@ public class RestClaimCenterClient implements ClaimCenterClient {
   public record ClaimJson(String number, String status, String adjusterName, String eta) {}
   public record SlotJson(String id, String label) {}
   public record BookingJson(String confirmation) {}
+  public record FnolJson(String number) {}
 }
