@@ -2,6 +2,7 @@ package com.etg.messaging;
 
 import com.etg.consent.ConsentService;
 import com.etg.inbox.InboxService;
+import com.etg.salesforce.SalesforceSync;
 import org.springframework.stereotype.Service;
 
 /**
@@ -14,14 +15,18 @@ public class KeywordRouter {
   private final ConsentService consent;
   private final BalanceProvider balances;
   private final InboxService inbox;
+  private final SalesforceSync sync;
 
-  public KeywordRouter(ConsentService consent, BalanceProvider balances, InboxService inbox) {
+  public KeywordRouter(ConsentService consent, BalanceProvider balances,
+                       InboxService inbox, SalesforceSync sync) {
     this.consent = consent;
     this.balances = balances;
     this.inbox = inbox;
+    this.sync = sync;
   }
 
   public String route(String from, String body) {
+    sync.syncContact(from, "servicing");
     String keyword = body == null ? "" : body.trim().toUpperCase();
     if (keyword.startsWith("STOP") || keyword.startsWith("UNSUBSCRIBE") || keyword.startsWith("QUIT")
         || keyword.startsWith("END") || keyword.startsWith("CANCEL")) {

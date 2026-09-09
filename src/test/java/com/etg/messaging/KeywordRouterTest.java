@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.etg.consent.ConsentService;
 import com.etg.inbox.InboxService;
+import com.etg.salesforce.SalesforceSync;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,6 +18,7 @@ class KeywordRouterTest {
   @Mock ConsentService consent;
   @Mock BalanceProvider balances;
   @Mock InboxService inbox;
+  @Mock SalesforceSync sync;
   @InjectMocks KeywordRouter router;
 
   @Test

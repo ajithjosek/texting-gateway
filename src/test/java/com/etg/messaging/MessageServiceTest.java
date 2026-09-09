@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.etg.consent.ConsentDeniedException;
 import com.etg.outbox.OutboxRepository;
+import com.etg.salesforce.SalesforceSync;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,7 @@ class MessageServiceTest {
   @Mock OutboxRepository outbox;
   @Mock TwilioSender sender;
   @Mock SendPolicy policy;
+  @Mock SalesforceSync sync;
   @Spy com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
   @InjectMocks MessageService service;
 

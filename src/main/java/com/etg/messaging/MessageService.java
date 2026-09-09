@@ -2,6 +2,7 @@ package com.etg.messaging;
 
 import com.etg.outbox.OutboxEvent;
 import com.etg.outbox.OutboxRepository;
+import com.etg.salesforce.SalesforceSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -25,16 +26,18 @@ public class MessageService {
   private final TwilioSender sender;
   private final SendPolicy policy;
   private final ObjectMapper json;
+  private final SalesforceSync sync;
 
   public MessageService(MessageRepository messages, DeliveryRepository deliveries,
                         OutboxRepository outbox, TwilioSender sender,
-                        SendPolicy policy, ObjectMapper json) {
+                        SendPolicy policy, ObjectMapper json, SalesforceSync sync) {
     this.messages = messages;
     this.deliveries = deliveries;
     this.outbox = outbox;
     this.sender = sender;
     this.policy = policy;
     this.json = json;
+    this.sync = sync;
   }
 
   @Transactional
@@ -51,6 +54,7 @@ public class MessageService {
             outbox.save(new OutboxEvent("message", String.valueOf(saved.getId()),
                 "message.created", toJson(Map.of("to", toPhone, "topic", topic,
                     "sid", sid, "key", idempotencyKey))));
+            sync.logSend(toPhone, topic, sid);
             return saved;
           } catch (DataIntegrityViolationException race) {
             // Lost a concurrent insert race on idempotency_key — return the winner.

@@ -2,6 +2,7 @@ package com.etg.inbox;
 
 import com.etg.consent.ConsentService;
 import com.etg.messaging.MessageService;
+import com.etg.salesforce.SalesforceSync;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -25,14 +26,17 @@ public class InboxService {
   private final ConversationMessageRepository thread;
   private final ConsentService consent;
   private final MessageService messages;
+  private final SalesforceSync sync;
   private final Clock clock;
 
   public InboxService(ConversationRepository conversations, ConversationMessageRepository thread,
-                      ConsentService consent, MessageService messages, Clock clock) {
+                      ConsentService consent, MessageService messages,
+                      SalesforceSync sync, Clock clock) {
     this.conversations = conversations;
     this.thread = thread;
     this.consent = consent;
     this.messages = messages;
+    this.sync = sync;
     this.clock = clock;
   }
 
@@ -93,7 +97,9 @@ public class InboxService {
     c.setStatus(Conversation.CLOSED);
     c.setClosedAt(now());
     c.touch(now());
-    return conversations.save(c);
+    Conversation saved = conversations.save(c);
+    sync.pushTranscript(saved, thread.findByConversationIdOrderByCreatedAtAscIdAsc(id));
+    return saved;
   }
 
   @Transactional
