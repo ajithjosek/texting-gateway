@@ -13,9 +13,10 @@ import org.springframework.web.bind.annotation.*;
 public class MessageController {
   private final ConsentService consent;
   private final MessageService messages;
+  private final PhoneValidator phones;
 
-  public MessageController(ConsentService consent, MessageService messages) {
-    this.consent = consent; this.messages = messages;
+  public MessageController(ConsentService consent, MessageService messages, PhoneValidator phones) {
+    this.consent = consent; this.messages = messages; this.phones = phones;
   }
 
   public record SendRequest(@NotBlank String toE164, @NotBlank String topic,
@@ -27,6 +28,7 @@ public class MessageController {
       @RequestHeader(value = "Idempotency-Key", required = false) String headerKey) {
     String key = (req.idempotencyKey() != null) ? req.idempotencyKey()
         : (headerKey != null ? headerKey : UUID.randomUUID().toString());
+    phones.validate(req.toE164());
     consent.requireOptIn(req.toE164(), req.topic()); // TCPA gate (ADR-007)
     Message saved = messages.send(req.toE164(), req.topic(), req.body(), key,
         req.recipientTimezone());

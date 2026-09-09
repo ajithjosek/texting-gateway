@@ -17,6 +17,7 @@ class MessageControllerTest {
 
   @Mock ConsentService consent;
   @Mock MessageService messages;
+  @Mock PhoneValidator phones;
   @InjectMocks MessageController controller;
 
   private static Message saved(String sid, String key, String status) {

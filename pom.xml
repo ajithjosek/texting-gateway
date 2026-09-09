@@ -71,6 +71,11 @@
       <artifactId>twilio</artifactId>
       <version>${twilio.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.googlecode.libphonenumber</groupId>
+      <artifactId>libphonenumber</artifactId>
+      <version>8.13.44</version>
+    </dependency>
     <!-- Cloud-portability adapters (wired by profile; safe to keep on classpath) -->
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
