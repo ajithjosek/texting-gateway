@@ -16,13 +16,14 @@ public class TwilioSender {
 
   @PostConstruct
   void init() {
-    if (!accountSid.isBlank() && !authToken.isBlank()) {
+    if (accountSid != null && !accountSid.isBlank() && authToken != null && !authToken.isBlank()) {
       Twilio.init(accountSid, authToken);
     }
   }
 
   public String send(String toE164, String body) {
-    if (accountSid.isBlank() || messagingServiceSid.isBlank()) {
+    if (accountSid == null || accountSid.isBlank() || messagingServiceSid == null
+        || messagingServiceSid.isBlank()) {
       return "SM-stub-no-credentials"; // local dev without Twilio creds
     }
     Message m = Message.creator(new PhoneNumber(toE164), messagingServiceSid, body).create();

@@ -1,0 +1,14 @@
+{
+  "name": "etg-frontend-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UI tests for Enterprise Texting Gateway frontend (Playwright)",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "install:browsers": "playwright install chromium --with-deps"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1"
+  }
+}
