@@ -4,6 +4,7 @@ import com.etg.outbox.OutboxEvent;
 import com.etg.outbox.OutboxRepository;
 import com.etg.salesforce.SalesforceSync;
 import com.etg.consent.ConsentService;
+import com.etg.whatsapp.WhatsappTemplateService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -29,11 +30,12 @@ public class MessageService {
   private final ObjectMapper json;
   private final SalesforceSync sync;
   private final ConsentService consent;
+  private final WhatsappTemplateService whatsapp;
 
   public MessageService(MessageRepository messages, DeliveryRepository deliveries,
                         OutboxRepository outbox, TwilioSender sender,
                         SendPolicy policy, ObjectMapper json, SalesforceSync sync,
-                        ConsentService consent) {
+                        ConsentService consent, WhatsappTemplateService whatsapp) {
     this.messages = messages;
     this.deliveries = deliveries;
     this.outbox = outbox;
@@ -42,17 +44,46 @@ public class MessageService {
     this.json = json;
     this.sync = sync;
     this.consent = consent;
+    this.whatsapp = whatsapp;
   }
 
   @Transactional
   public Message send(String toPhone, String topic, String body,
                       String idempotencyKey, String recipientTimezone) {
+    return sendRich(toPhone, topic, body, idempotencyKey, recipientTimezone, "sms", null, null);
+  }
+
+  /**
+   * Channel-aware send. {@code whatsapp} requires an approved Content template and
+   * falls back to SMS on sender failure; {@code auto} picks WhatsApp when approved,
+   * SMS otherwise.
+   */
+  @Transactional
+  public Message sendRich(String toPhone, String topic, String body, String idempotencyKey,
+                          String recipientTimezone, String channel, String contentSid,
+                          String contentVariables) {
     return messages.findByIdempotencyKey(idempotencyKey)
         .orElseGet(() -> {
           consent.requireOptIn(toPhone, topic); // TCPA gate for every send path (ADR-007)
           policy.check(toPhone, topic, recipientTimezone);
-          String sid = sender.send(toPhone, body);
-          Message m = new Message("default", toPhone, null, "sms", topic,
+          boolean wantWhatsapp = "whatsapp".equalsIgnoreCase(channel)
+              || ("auto".equalsIgnoreCase(channel) && whatsapp.approvedFor(contentSid).isPresent());
+          String sid;
+          String resolved = "sms";
+          if (wantWhatsapp) {
+            if (whatsapp.approvedFor(contentSid).isEmpty()) {
+              throw new ChannelNotAvailableException("CHANNEL_NOT_APPROVED: " + contentSid);
+            }
+            try {
+              sid = sender.sendWhatsapp(toPhone, contentSid, contentVariables);
+              resolved = "whatsapp";
+            } catch (RuntimeException e) {
+              sid = sender.send(toPhone, body); // fallback chain
+            }
+          } else {
+            sid = sender.send(toPhone, body);
+          }
+          Message m = new Message("default", toPhone, null, resolved, topic,
               sha256Hex(body), "queued", sid, idempotencyKey);
           try {
             Message saved = messages.save(m);

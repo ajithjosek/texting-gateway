@@ -38,6 +38,7 @@ public class Message {
   public Long getId() { return id; }
   public String getTenant() { return tenant; }
   public String getToPhone() { return toPhone; }
+  public String getChannel() { return channel; }
   public String getTopic() { return topic; }
   public String getBodyHash() { return bodyHash; }
   public String getStatus() { return status; }

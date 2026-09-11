@@ -13,6 +13,7 @@ public class TwilioSender {
   @Value("${TWILIO_ACCOUNT_SID:}") private String accountSid;
   @Value("${TWILIO_AUTH_TOKEN:}") private String authToken;
   @Value("${TWILIO_MESSAGING_SERVICE_SID:}") private String messagingServiceSid;
+  @Value("${TWILIO_WHATSAPP_FROM:}") private String whatsappFrom;
 
   @PostConstruct
   void init() {
@@ -28,6 +29,19 @@ public class TwilioSender {
       return "SM-stub-" + java.util.UUID.randomUUID().toString().substring(0, 8);
     }
     Message m = Message.creator(new PhoneNumber(toE164), messagingServiceSid, body).create();
+    return m.getSid();
+  }
+
+  /** WhatsApp send via an approved Content template. Variables are a JSON object string. */
+  public String sendWhatsapp(String toE164, String contentSid, String contentVariables) {
+    if (accountSid == null || accountSid.isBlank() || whatsappFrom == null || whatsappFrom.isBlank()) {
+      return "SM-stub-wa-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    }
+    Message m = Message.creator(new PhoneNumber("whatsapp:" + toE164),
+            new PhoneNumber("whatsapp:" + whatsappFrom), "")
+        .setContentSid(contentSid)
+        .setContentVariables(contentVariables == null ? "{}" : contentVariables)
+        .create();
     return m.getSid();
   }
 }

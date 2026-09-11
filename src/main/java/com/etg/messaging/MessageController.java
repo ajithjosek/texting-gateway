@@ -21,7 +21,8 @@ public class MessageController {
 
   public record SendRequest(@NotBlank String toE164, @NotBlank String topic,
                             @NotBlank String body, String idempotencyKey,
-                            String recipientTimezone) {}
+                            String recipientTimezone, String channel,
+                            String contentSid, String contentVariables) {}
 
   @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
   public Map<String, String> send(@Valid @RequestBody SendRequest req,
@@ -30,9 +31,9 @@ public class MessageController {
         : (headerKey != null ? headerKey : UUID.randomUUID().toString());
     phones.validate(req.toE164());
     consent.requireOptIn(req.toE164(), req.topic()); // TCPA gate (ADR-007)
-    Message saved = messages.send(req.toE164(), req.topic(), req.body(), key,
-        req.recipientTimezone());
+    Message saved = messages.sendRich(req.toE164(), req.topic(), req.body(), key,
+        req.recipientTimezone(), req.channel(), req.contentSid(), req.contentVariables());
     return Map.of("sid", saved.getTwilioSid(), "idempotencyKey", saved.getIdempotencyKey(),
-        "status", saved.getStatus());
+        "status", saved.getStatus(), "channel", saved.getChannel());
   }
 }
