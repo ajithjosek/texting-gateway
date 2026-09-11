@@ -8,9 +8,11 @@ import org.junit.jupiter.api.Test;
 class TwilioSenderTest {
 
   @Test
-  void send_withoutCredentials_returnsStubSid() {
+  void send_withoutCredentials_returnsUniqueStubSids() {
     TwilioSender sender = new TwilioSender(); // @Value fields default to ""
-    String sid = sender.send("+15550009111", "hello");
-    assertThat(sid).isEqualTo("SM-stub-no-credentials");
+    String a = sender.send("+15550009111", "hello");
+    String b = sender.send("+15550009111", "hello");
+    assertThat(a).startsWith("SM-stub-");
+    assertThat(b).startsWith("SM-stub-").isNotEqualTo(a);
   }
 }

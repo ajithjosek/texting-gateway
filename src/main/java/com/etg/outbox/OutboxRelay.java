@@ -20,12 +20,15 @@ public class OutboxRelay {
 
   private final OutboxRepository outbox;
   private final RabbitTemplate rabbit;
+  private final FileWarehouseSink warehouse;
   private final String exchange;
 
   public OutboxRelay(OutboxRepository outbox, RabbitTemplate rabbit,
+                     FileWarehouseSink warehouse,
                      @Value("${etg.events-exchange:etg.events}") String exchange) {
     this.outbox = outbox;
     this.rabbit = rabbit;
+    this.warehouse = warehouse;
     this.exchange = exchange;
   }
 
@@ -38,6 +41,7 @@ public class OutboxRelay {
         rabbit.convertAndSend(exchange, e.getEventType(), e.getPayload());
         e.markPublished();
         outbox.save(e);
+        warehouse.append(e); // file mirrors exactly the published stream
       } catch (AmqpException ex) {
         log.warn("Outbox publish failed (event {}), will retry: {}", e.getId(), ex.getMessage());
         return; // keep order, retry from here next tick

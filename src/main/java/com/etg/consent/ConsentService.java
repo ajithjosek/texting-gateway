@@ -1,5 +1,9 @@
 package com.etg.consent;
 
+import com.etg.outbox.OutboxEvent;
+import com.etg.outbox.OutboxRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -8,10 +12,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class ConsentService {
   private final ConsentRepository repo;
   private final ConsentEventRepository events;
+  private final OutboxRepository outbox;
+  private final ObjectMapper json;
 
-  public ConsentService(ConsentRepository repo, ConsentEventRepository events) {
+  public ConsentService(ConsentRepository repo, ConsentEventRepository events,
+                        OutboxRepository outbox, ObjectMapper json) {
     this.repo = repo;
     this.events = events;
+    this.outbox = outbox;
+    this.json = json;
   }
 
   public void requireOptIn(String phoneE164, String topic) {
@@ -43,6 +52,14 @@ public class ConsentService {
       saved = repo.save(existing);
     }
     events.save(new ConsentEvent(phone, topic, oldStatus, newStatus, source, actor));
+    try {
+      outbox.save(new OutboxEvent("consent", phone + ":" + topic, "consent.updated",
+          json.writeValueAsString(Map.of("phone", phone, "topic", topic,
+              "oldStatus", oldStatus == null ? "" : oldStatus, "newStatus", newStatus,
+              "source", source, "actor", actor == null ? "" : actor))));
+    } catch (Exception e) {
+      throw new IllegalStateException("Consent outbox serialization failed", e);
+    }
     return saved;
   }
 }

@@ -30,6 +30,7 @@ public class OutboxEvent {
   public String getAggregateId() { return aggregateId; }
   public String getEventType() { return eventType; }
   public String getPayload() { return payload; }
+  public Instant getCreatedAt() { return createdAt; }
   public Instant getPublishedAt() { return publishedAt; }
   public void markPublished() { this.publishedAt = Instant.now(); }
 }

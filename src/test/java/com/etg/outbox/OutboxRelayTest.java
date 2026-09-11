@@ -17,9 +17,10 @@ class OutboxRelayTest {
 
   @Mock OutboxRepository outbox;
   @Mock RabbitTemplate rabbit;
+  @Mock com.etg.outbox.FileWarehouseSink warehouse;
 
   private OutboxRelay relay() {
-    return new OutboxRelay(outbox, rabbit, "etg.events");
+    return new OutboxRelay(outbox, rabbit, warehouse, "etg.events");
   }
 
   @Test

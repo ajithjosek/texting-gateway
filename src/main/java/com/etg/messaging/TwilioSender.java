@@ -24,7 +24,8 @@ public class TwilioSender {
   public String send(String toE164, String body) {
     if (accountSid == null || accountSid.isBlank() || messagingServiceSid == null
         || messagingServiceSid.isBlank()) {
-      return "SM-stub-no-credentials"; // local dev without Twilio creds
+      // Local dev without Twilio creds: unique stub SID per send (real SIDs are unique too).
+      return "SM-stub-" + java.util.UUID.randomUUID().toString().substring(0, 8);
     }
     Message m = Message.creator(new PhoneNumber(toE164), messagingServiceSid, body).create();
     return m.getSid();

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /** Pure unit tests for ConsentService (no Spring context). DB-backed roundtrip lives in ConsentServiceTest. */
@@ -17,6 +18,8 @@ class ConsentServiceUnitTest {
 
   @Mock ConsentRepository repo;
   @Mock ConsentEventRepository events;
+  @Mock com.etg.outbox.OutboxRepository outbox;
+  @Spy com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
   @InjectMocks ConsentService service;
 
   @Test
