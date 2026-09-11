@@ -70,4 +70,13 @@ class RestClaimCenterClientTest {
         .contains(new com.etg.claimcenter.FnolResult("CLM-3001"));
     server.verify();
   }
+
+  @Test
+  void attachPhoto_postsAndReturnsTrue() {
+    server.expect(requestTo("https://gw.example/cc/rest/claims/CLM-1001/attachments"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+    assertThat(client.attachPhoto("CLM-1001", "s3://b/k.jpg", "image/jpeg")).isTrue();
+    server.verify();
+  }
 }

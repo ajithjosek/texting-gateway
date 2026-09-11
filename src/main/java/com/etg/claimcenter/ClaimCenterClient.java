@@ -13,4 +13,6 @@ public interface ClaimCenterClient {
   Optional<Booking> bookSlot(String claimNumber, String slotId, String phoneE164);
   /** File a first notice of loss; empty when ClaimCenter rejects the request. */
   Optional<FnolResult> createFnol(FnolRequest request);
+  /** Attach a stored photo to a claim; false when ClaimCenter rejects it. */
+  boolean attachPhoto(String claimNumber, String mediaRef, String contentType);
 }

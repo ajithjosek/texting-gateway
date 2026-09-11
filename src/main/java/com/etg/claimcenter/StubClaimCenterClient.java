@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** Seeded demo claims until Guidewire credentials are configured. */
@@ -21,6 +22,7 @@ public class StubClaimCenterClient implements ClaimCenterClient {
   private final Clock clock;
   private final Map<String, ClaimStatus> claims = new ConcurrentHashMap<>();
   private final AtomicInteger fnolSeq = new AtomicInteger(2000);
+  private final List<PhotoAttachment> attaches = new CopyOnWriteArrayList<>();
 
   public StubClaimCenterClient(Clock clock) {
     this.clock = clock;
@@ -59,6 +61,16 @@ public class StubClaimCenterClient implements ClaimCenterClient {
     claims.put(number, new ClaimStatus(number, "Open - intake review",
         "Unassigned", "Pending review"));
     return Optional.of(new FnolResult(number));
+  }
+
+  @Override
+  public boolean attachPhoto(String claimNumber, String mediaRef, String contentType) {
+    attaches.add(new PhotoAttachment(claimNumber.toUpperCase(), mediaRef, contentType));
+    return true;
+  }
+
+  public List<PhotoAttachment> attaches() {
+    return List.copyOf(attaches);
   }
 
   private AdjusterSlot slot(String claimNumber, String suffix, Instant at) {

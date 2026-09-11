@@ -1,8 +1,12 @@
 package com.etg.messaging;
 
 import com.twilio.security.RequestValidator;
+import com.etg.claims.PhotoIntakeService;
+import com.etg.media.InboundMedia;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -14,9 +18,11 @@ import org.springframework.web.bind.annotation.*;
 public class TwilioWebhookController {
   private final KeywordRouter router;
   private final MessageService messages;
+  private final PhotoIntakeService photos;
 
-  public TwilioWebhookController(KeywordRouter router, MessageService messages) {
-    this.router = router; this.messages = messages;
+  public TwilioWebhookController(KeywordRouter router, MessageService messages,
+                                 PhotoIntakeService photos) {
+    this.router = router; this.messages = messages; this.photos = photos;
   }
 
   @Value("${TWILIO_AUTH_TOKEN:}") private String authToken;
@@ -41,7 +47,28 @@ public class TwilioWebhookController {
       @RequestParam(value = "From", required = false) String from,
       @RequestParam(value = "Body", required = false, defaultValue = "") String body) {
     if (!valid(req)) return "<Response></Response>";
+    List<InboundMedia> media = attachedMedia(req);
+    if (!media.isEmpty()) {
+      return twiml(photos.handle(from, body, media));
+    }
     return twiml(router.route(from, body));
+  }
+
+  private static List<InboundMedia> attachedMedia(HttpServletRequest req) {
+    int count;
+    try {
+      count = Integer.parseInt(req.getParameter("NumMedia"));
+    } catch (Exception e) {
+      return List.of();
+    }
+    List<InboundMedia> out = new ArrayList<>();
+    for (int i = 0; i < Math.min(count, 10); i++) {
+      String url = req.getParameter("MediaUrl" + i);
+      if (url == null || url.isBlank()) continue;
+      String type = req.getParameter("MediaContentType" + i);
+      out.add(new InboundMedia(url, type == null ? "" : type));
+    }
+    return out;
   }
 
   @PostMapping(value = "/dlr", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)

@@ -1,5 +1,6 @@
 package com.etg.claimcenter;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -77,6 +78,18 @@ public class RestClaimCenterClient implements ClaimCenterClient {
     } catch (Exception e) {
       log.warn("ClaimCenter FNOL failed for {}: {}", request.policyNumber(), e.getMessage());
       return Optional.empty();
+    }
+  }
+
+  @Override
+  public boolean attachPhoto(String claimNumber, String mediaRef, String contentType) {
+    try {
+      post("/cc/rest/claims/" + claimNumber + "/attachments",
+          java.util.Map.of("mediaRef", mediaRef, "contentType", contentType), JsonNode.class);
+      return true;
+    } catch (Exception e) {
+      log.warn("ClaimCenter attach failed for {}: {}", claimNumber, e.getMessage());
+      return false;
     }
   }
 
